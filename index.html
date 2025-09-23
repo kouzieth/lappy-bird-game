@@ -1,385 +1,86 @@
-<!DOCTYPE html>
-<html lang="id">
+<!doctype html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flappy Bird Game</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
-            font-family: 'Arial Rounded MT Bold', 'Arial', sans-serif;
-        }
-        
-        #game-container {
-            position: relative;
-            width: 320px;
-            height: 480px;
-            overflow: hidden;
-            border: 3px solid #333;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        #game-canvas {
-            background-color: #70c5ce;
-        }
-        
-        #start-screen, #game-over {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            text-align: center;
-        }
-        
-        #game-over {
-            display: none;
-        }
-        
-        h1 {
-            color: #f1c40f;
-            text-shadow: 2px 2px 0 #000;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        
-        button {
-            background-color: #f1c40f;
-            border: none;
-            border-radius: 20px;
-            color: #333;
-            padding: 10px 20px;
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 20px;
-            cursor: pointer;
-            box-shadow: 0 4px 0 #d35400;
-            transition: all 0.1s;
-        }
-        
-        button:hover {
-            background-color: #f39c12;
-            transform: translateY(2px);
-            box-shadow: 0 2px 0 #d35400;
-        }
-        
-        .score-display {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            font-size: 24px;
-            font-weight: bold;
-            color: white;
-            text-shadow: 2px 2px 0 #000;
-        }
-        
-        .instructions {
-            margin-top: 15px;
-            font-size: 14px;
-            max-width: 80%;
-            line-height: 1.4;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <title>Base Jackpot Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.min.js"></script>
+  <style>
+    body{font-family:system-ui;background:#0b1220;color:#fff;padding:24px}
+    button{padding:8px 12px;margin:6px}
+    input{padding:6px;margin:6px}
+    pre{background:#061020;padding:12px;border-radius:8px}
+  </style>
 </head>
 <body>
-    <div id="game-container">
-        <canvas id="game-canvas" width="320" height="480"></canvas>
-        
-        <div class="score-display">Skor: <span id="score">0</span></div>
-        
-        <div id="start-screen">
-            <h1>FLAPPY BIRD</h1>
-            <p class="instructions">Klik atau tekan spasi untuk terbang</p>
-            <p class="instructions">Hindari pipa dan jangan jatuh!</p>
-            <button id="start-button">Mulai Game</button>
-        </div>
-        
-        <div id="game-over">
-            <h1>GAME OVER</h1>
-            <p>Skor Akhir: <span id="final-score">0</span></p>
-            <button id="restart-button">Main Lagi</button>
-        </div>
-    </div>
+  <h2>Base Jackpot - Demo (ethers.js)</h2>
+  <div>
+    <button id="connect">Connect Wallet</button>
+    <button id="commit" disabled>Commit Round (owner)</button>
+    <button id="enter" disabled>Enter Round (0.01)</button>
+    <button id="reveal" disabled>Reveal Round (owner)</button>
+  </div>
+  <div>
+    <input id="serverSeed" placeholder="server seed (owner)" />
+    <input id="playerSeed" placeholder="player seed (hex)" />
+  </div>
+  <pre id="log"></pre>
 
-    <script>
-        // Elemen game
-        const canvas = document.getElementById('game-canvas');
-        const ctx = canvas.getContext('2d');
-        const scoreDisplay = document.getElementById('score');
-        const finalScoreDisplay = document.getElementById('final-score');
-        const startScreen = document.getElementById('start-screen');
-        const gameOverScreen = document.getElementById('game-over');
-        const startButton = document.getElementById('start-button');
-        const restartButton = document.getElementById('restart-button');
-        
-        // Variabel game
-        let gameRunning = false;
-        let score = 0;
-        let frames = 0;
-        
-        // Konstanta game
-        const GRAVITY = 0.25;
-        const JUMP = -4.6;
-        const PIPE_GAP = 120;
-        const PIPE_INTERVAL = 100;
-        
-        // Bird object
-        const bird = {
-            x: 50,
-            y: canvas.height / 2,
-            width: 34,
-            height: 24,
-            velocity: 0,
-            
-            draw: function() {
-                ctx.fillStyle = '#f1c40f';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.width/2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Mata burung
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(this.x + 8, this.y - 5, 6, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.fillStyle = 'black';
-                ctx.beginPath();
-                ctx.arc(this.x + 10, this.y - 5, 3, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Paruh burung
-                ctx.fillStyle = '#e74c3c';
-                ctx.beginPath();
-                ctx.moveTo(this.x + 12, this.y);
-                ctx.lineTo(this.x + 25, this.y);
-                ctx.lineTo(this.x + 12, this.y + 5);
-                ctx.fill();
-            },
-            
-            update: function() {
-                // Terapkan gravitasi
-                this.velocity += GRAVITY;
-                this.y += this.velocity;
-                
-                // Cek jika burung jatuh ke bawah
-                if (this.y + this.height/2 >= canvas.height) {
-                    this.y = canvas.height - this.height/2;
-                    gameOver();
-                }
-                
-                // Cek jika burung terbang terlalu tinggi
-                if (this.y - this.height/2 <= 0) {
-                    this.y = this.height/2;
-                    this.velocity = 0;
-                }
-            },
-            
-            flap: function() {
-                this.velocity = JUMP;
-            },
-            
-            reset: function() {
-                this.y = canvas.height / 2;
-                this.velocity = 0;
-            }
-        };
-        
-        // Pipa object
-        const pipes = {
-            position: [],
-            
-            // Method untuk menambah pipa
-            add: function() {
-                const gapPosition = Math.random() * (canvas.height - PIPE_GAP - 100) + 50;
-                
-                this.position.push({
-                    x: canvas.width,
-                    y: 0,
-                    width: 52,
-                    height: gapPosition,
-                    passed: false
-                });
-                
-                this.position.push({
-                    x: canvas.width,
-                    y: gapPosition + PIPE_GAP,
-                    width: 52,
-                    height: canvas.height - gapPosition - PIPE_GAP
-                });
-            },
-            
-            // Method untuk menggambar pipa
-            draw: function() {
-                for (let i = 0; i < this.position.length; i++) {
-                    const pipe = this.position[i];
-                    
-                    ctx.fillStyle = '#2ecc71';
-                    ctx.fillRect(pipe.x, pipe.y, pipe.width, pipe.height);
-                    
-                    // Tambahkan detail pada pipa
-                    ctx.fillStyle = '#27ae60';
-                    ctx.fillRect(pipe.x - 2, pipe.y, 5, pipe.height);
-                    ctx.fillRect(pipe.x + pipe.width - 3, pipe.y, 5, pipe.height);
-                }
-            },
-            
-            // Method untuk update posisi pipa
-            update: function() {
-                // Tambah pipa baru secara berkala
-                if (frames % PIPE_INTERVAL === 0) {
-                    this.add();
-                }
-                
-                for (let i = 0; i < this.position.length; i++) {
-                    const pipe = this.position[i];
-                    
-                    // Gerakkan pipa ke kiri
-                    pipe.x -= 2;
-                    
-                    // Hapus pipa yang sudah lewat layar
-                    if (pipe.x + pipe.width < 0) {
-                        this.position.splice(i, 1);
-                        i--;
-                        continue;
-                    }
-                    
-                    // Deteksi tabrakan
-                    if (
-                        bird.x + bird.width/2 > pipe.x && 
-                        bird.x - bird.width/2 < pipe.x + pipe.width && 
-                        (bird.y - bird.height/2 < pipe.height + pipe.y || 
-                         bird.y + bird.height/2 > pipe.y + (i % 2 === 0 ? 0 : PIPE_GAP))
-                    ) {
-                        gameOver();
-                    }
-                    
-                    // Deteksi jika burung berhasil melewati pipa
-                    if (pipe.x + pipe.width < bird.x && !pipe.passed && i % 2 === 0) {
-                        score++;
-                        scoreDisplay.textContent = score;
-                        pipe.passed = true;
-                    }
-                }
-            },
-            
-            // Reset semua pipa
-            reset: function() {
-                this.position = [];
-            }
-        };
-        
-        // Latar belakang dan tanah
-        function drawBackground() {
-            // Langit
-            ctx.fillStyle = '#70c5ce';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Awan
-            ctx.fillStyle = 'white';
-            for (let i = 0; i < 3; i++) {
-                const x = (frames + i * 100) % (canvas.width + 100) - 50;
-                const y = 60 + i * 30;
-                
-                ctx.beginPath();
-                ctx.arc(x, y, 20, 0, Math.PI * 2);
-                ctx.arc(x + 15, y - 10, 15, 0, Math.PI * 2);
-                ctx.arc(x + 30, y, 18, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            
-            // Tanah
-            ctx.fillStyle = '#d35400';
-            ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
-            
-            // Detail tanah
-            ctx.fillStyle = '#e67e22';
-            for (let i = 0; i < canvas.width; i += 30) {
-                ctx.fillRect(i, canvas.height - 30, 15, 5);
-            }
-        }
-        
-        // Game loop
-        function gameLoop() {
-            if (!gameRunning) return;
-            
-            // Bersihkan canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Gambar background
-            drawBackground();
-            
-            // Update dan gambar pipa
-            pipes.update();
-            pipes.draw();
-            
-            // Update dan gambar burung
-            bird.update();
-            bird.draw();
-            
-            frames++;
-            
-            requestAnimationFrame(gameLoop);
-        }
-        
-        // Start game
-        function startGame() {
-            gameRunning = true;
-            score = 0;
-            frames = 0;
-            scoreDisplay.textContent = score;
-            
-            startScreen.style.display = 'none';
-            gameOverScreen.style.display = 'none';
-            
-            bird.reset();
-            pipes.reset();
-            
-            gameLoop();
-        }
-        
-        // Game over
-        function gameOver() {
-            gameRunning = false;
-            finalScoreDisplay.textContent = score;
-            gameOverScreen.style.display = 'flex';
-        }
-        
-        // Event listeners
-        startButton.addEventListener('click', startGame);
-        restartButton.addEventListener('click', startGame);
-        
-        canvas.addEventListener('click', function() {
-            if (gameRunning) {
-                bird.flap();
-            }
-        });
-        
-        document.addEventListener('keydown', function(e) {
-            if (e.code === 'Space') {
-                if (gameRunning) {
-                    bird.flap();
-                    e.preventDefault();
-                } else if (gameOverScreen.style.display === 'flex') {
-                    startGame();
-                } else {
-                    startScreen.style.display = 'none';
-                    startGame();
-                }
-            }
-        });
-    </script>
+<script>
+const logEl = document.getElementById('log');
+function log(txt){ logEl.textContent = new Date().toISOString() + " - " + txt + "\\n" + logEl.textContent; }
+
+let provider, signer, contract;
+const CONTRACT_ADDRESS = "PASTE_YOUR_DEPLOYED_CONTRACT_ADDRESS_HERE";
+const ABI = [ /* minimal ABI subset: commitRound, enter, revealRound */ 
+  "function commitRound(bytes32) external",
+  "function enter(bytes32) external payable",
+  "function revealRound(string) external",
+  "event RoundCommitted(uint256, bytes32)",
+  "event PlayerEntered(uint256, address, uint256)",
+  "event RoundRevealed(uint256, string, address, uint256)"
+];
+
+document.getElementById('connect').onclick = async ()=>{
+  if (!window.ethereum) return alert("Install MetaMask");
+  provider = new ethers.BrowserProvider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  signer = await provider.getSigner();
+  contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+  log("Connected: " + await signer.getAddress());
+  document.getElementById('commit').disabled = false;
+  document.getElementById('enter').disabled = false;
+  document.getElementById('reveal').disabled = false;
+};
+
+document.getElementById('commit').onclick = async ()=>{
+  const seed = document.getElementById('serverSeed').value;
+  if(!seed) return alert("Set serverSeed");
+  const hash = ethers.keccak256(ethers.toUtf8Bytes(seed));
+  const tx = await contract.commitRound(hash);
+  log("Commit tx sent: " + tx.hash);
+  await tx.wait();
+  log("Committed round with hash: " + hash);
+};
+
+document.getElementById('enter').onclick = async ()=>{
+  if(!contract) return alert("Connect first");
+  const playerSeed = document.getElementById('playerSeed').value || "0x0000000000000000000000000000000000000000000000000000000000000000";
+  // stake 0.01 ETH (adjust to Base token)
+  const stake = ethers.parseEther("0.01");
+  const tx = await contract.enter(playerSeed, { value: stake });
+  log("Enter tx: " + tx.hash);
+  await tx.wait();
+  log("Entered round");
+};
+
+document.getElementById('reveal').onclick = async ()=>{
+  const seed = document.getElementById('serverSeed').value;
+  if(!seed) return alert("Set serverSeed");
+  const tx = await contract.revealRound(seed);
+  log("Reveal tx sent: " + tx.hash);
+  await tx.wait();
+  log("Reveal completed");
+};
+</script>
 </body>
 </html>
